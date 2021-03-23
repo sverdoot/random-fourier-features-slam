@@ -17,7 +17,7 @@ class Landscape(object):
         
 
 class Odometry(object):
-    def __init__(self, landscape, observation_dim, max_time=100):
+    def __init__(self, landscape, observation_dim, max_time=100, beta = np.array([10., 10.])):
         self.landscape = landscape
         self.states = []
         self.observations = []
@@ -25,7 +25,7 @@ class Odometry(object):
         self.times = []
 
         self.alphas = np.array([0.05, 0.001, 0.05, 0.01])
-        self.beta = np.array([10., 10.])
+        self.beta = beta
         self.Q = np.diag([*(self.beta ** 2), 0])
 
         self.observation_dim = observation_dim
