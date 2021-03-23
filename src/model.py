@@ -4,13 +4,14 @@ import scipy
 from scipy.linalg import block_diag
 from pathlib import Path
 
-from data_utils import get_prediction
+from data_utils import get_prediction, wrap_angle
 
 
 class Model(object):
     def __init__(self,
                 rff, 
                 initial_values, 
+                initial_state,
                 times, 
                 measurements,
                 measurement_covs, 
@@ -27,6 +28,7 @@ class Model(object):
 
         self.rff = rff
         self.initial_values = initial_values
+        self.initial_state = initial_state
         self.times = times
         self.measurements = measurements
         self.tol = tol
@@ -56,22 +58,38 @@ class Model(object):
 
         self.dampening_factor = dumpening_factor
 
-    def update_params(self):
         self.times = np.array(self.times)
-        features = np.stack([self.rff.get_random_features(self.times) for _ in range(self.state_dim)], 1)
+        self.features = np.stack([self.rff.get_random_features(self.times) for _ in range(self.state_dim)], 1)
+
+        self.prior_means = []
+        self.states = np.zeros((len(times), 3))
+
+
+        self.estimates_history = []
+
+    def update_params(self, n_iter=0):
+        #features = np.stack([self.rff.get_random_features(self.times) for _ in range(self.state_dim)], 1)
+        features = self.features
 
         A = 0
         g = 0
+        self.prior_means = []
         for i, t in enumerate(self.times):
             diag = np.concatenate([features[i].reshape(-1), np.ones(2*self.M)], 0)
             phi_matrix = np.diag(diag)
-            inv_phi_matrix = np.diag(diag**(-1))
 
 
             y_vector = phi_matrix @ self.b
             #y_vector[:self.n_features*self.state_dim] += self.prior_mean
             cut = y_vector[:self.n_features*self.state_dim].reshape(self.state_dim, self.n_features).sum(1)
-            cut += self.prior_mean(t)#, self.motions[i])
+            if n_iter <  10: # == 0 (!)
+                if i == 0:
+                    pass
+                else:
+                    self.states[i-1] = self.prior_means[i-1]
+            mean = self.prior_mean(t, np.concatenate([self.initial_state.reshape(1, self.state_dim), self.states], 0))
+            self.prior_means.append(mean)
+            cut += mean
             #reconst = np.concatenate([cut, y_vector[self.n_features*self.state_dim:]], 0)
 
             landmark_id = int(self.measurements[i, -1])
@@ -84,6 +102,7 @@ class Model(object):
             lands_part = np.zeros((obs_dim, 2*self.M))
 
             lands_part[:, 2*landmark_id:2*landmark_id+2] = dh[:, self.state_dim:]
+            
             dh = np.concatenate([state_part, lands_part], 1)
 
             A += phi_matrix.T @ dh.T @ self.inv_measurement_covs[i] @ dh @ phi_matrix
@@ -96,20 +115,25 @@ class Model(object):
         return A, g
 
     def solve(self, A, g):
-        A += self.dampening_factor * np.diag(A)
+        A = A + self.dampening_factor * np.diag(A)[:, None]
         db = scipy.linalg.solve(A, g)
         return db
 
-    def iteration(self):
-        A, g = self.update_params()
+    def iteration(self, n_iter=0):
+        A, g = self.update_params(n_iter=n_iter)
         db = self.solve(A, g)
         self.b += db
+        self.states = self.prior_means + (self.features * self.b[:self.n_features*self.state_dim].reshape(self.state_dim, -1)).sum(-1)
+        self.states[:, 2] = wrap_angle(self.states[:, 2])
+        self.estimates_history.append(self.states)
         return np.linalg.norm(db, 2)
 
-    def run_slam(self):
+    def run_slam(self, n_iter=None):
         eps = 10
         n = 0
         while eps > self.tol and n < self.max_n_iter:
-            n += 1
-            eps = self.iteration()
+            eps = self.iteration(n_iter=n)
             print(eps)
+            n += 1
+            if n_iter is not None and n >= n_iter:
+                break

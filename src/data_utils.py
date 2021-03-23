@@ -63,8 +63,8 @@ class Odometry(object):
         self.motions = []
         self.times = []
 
-        self.alphas = np.array([0.05, 0.001, 0.05, 0.01])
-        self.beta = np.array([10., 10.])
+        self.alphas = np.array([0, 0, 0, 0]) #np.array([0.05, 0.001, 0.05, 0.01])
+        self.beta = np.array([1., 1.]) #np.array([10., 10.])
         self.Q = np.diag([*(self.beta ** 2), 0])
 
         self.observation_dim = observation_dim
@@ -74,6 +74,7 @@ class Odometry(object):
         self.times = sorted(np.random.uniform(0, self.max_time, n_steps))
         initial_state = np.random.randn(3)
         state = initial_state
+        self.states.append(initial_state)
         drot1 = 0
         dtr = 1
         drot2 = 0
@@ -168,13 +169,15 @@ def wrap_angle(angle):
     :return: The wrapped angle (guaranteed to in [-pi, +pi]).
     """
 
-    pi2 = 2 * np.pi
+    # pi2 = 2 * np.pi
 
-    while angle < -np.pi:
-        angle += pi2
+    # while angle < -np.pi:
+    #     angle += pi2
 
-    while angle >= np.pi:
-        angle -= pi2
+    # while angle >= np.pi:
+    #     angle -= pi2
+
+    angle = (angle + np.pi) % (2 * np.pi) - np.pi
 
     return angle
 
