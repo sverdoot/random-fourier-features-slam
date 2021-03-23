@@ -2,6 +2,7 @@ import numpy as np
 
 
 class Landscape(object):
+    landmark_dim = 2
     def __init__(self, num_landmarks=10, field_borders=(-10, 10)):
         self.num_landmarks = num_landmarks
         self.field_borders = field_borders
@@ -17,21 +18,31 @@ class Landscape(object):
         
 
 class Odometry(object):
-    def __init__(self, landscape, observation_dim, max_time=100, beta = np.array([10., 10.])):
+    state_dim = 3
+    def __init__(self, 
+                landscape, 
+                observation_dim=3, 
+                max_time=100, 
+                beta : np.ndarray = np.array([10., 10.]),
+                alphas : np.ndarray = np.array([0.05, 0.001, 0.05, 0.01]),
+                max_landmarks_per_step : int = 2):
         self.landscape = landscape
         self.states = []
         self.observations = []
         self.motions = []
         self.times = []
 
-        self.alphas = np.array([0.05, 0.001, 0.05, 0.01])
+        self.alphas = alphas
         self.beta = beta
         self.Q = np.diag([*(self.beta ** 2), 0])
 
         self.observation_dim = observation_dim
         self.max_time = max_time
+        self.max_landmarks_per_step = max_landmarks_per_step
+        self.num_points = 0
 
     def generate(self, n_steps):
+        self.num_points = n_steps
         self.times = sorted(np.random.uniform(0, self.max_time, n_steps))
         initial_state = np.random.randn(3)
         state = initial_state
@@ -58,11 +69,10 @@ class Odometry(object):
                 
                 state = sample_from_odometry(state, motion, self.alphas)
                 
-                noise_free_observations = sense_landmarks(state, self.landscape, 1)
-                observation_noise = np.random.multivariate_normal(np.zeros(self.observation_dim), self.Q)
-                # Generate noisy observation as observed by the robot for the filter.
+                noise_free_observations = sense_landmarks(state, self.landscape, self.max_landmarks_per_step)
+                observation_noise = np.random.multivariate_normal(np.zeros(self.observation_dim), self.Q, size=len(noise_free_observations))
+                assert observation_noise.shape == noise_free_observations.shape
                 noisy_observations = np.empty(observation_noise.shape)
-                #print(noisy_observations.shape, observation_noise.shape)
                 #noisy_observations[0] = noise_free_observations[0] + observation_noise
                 noisy_observations = noise_free_observations + observation_noise
             # state = new_state
