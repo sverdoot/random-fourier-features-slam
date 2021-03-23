@@ -1,6 +1,79 @@
 import numpy as np
 
 
+class Landscape(object):
+    def __init__(self, num_landmarks=10, field_borders=(-10, 10)):
+        self.num_landmarks = num_landmarks
+        self.field_borders = field_borders
+
+        self.landmarks = []
+        self.landmarks_poses_x = []
+        self.landmarks_poses_y = []
+
+    def initialize(self):
+        self.landmarks = np.random.uniform(self.field_borders[0], self.field_borders[1], (self.num_landmarks, 2)).reshape(self.num_landmarks, 2)
+        self.landmarks_poses_x = self.landmarks[:, 0]
+        self.landmarks_poses_y = self.landmarks[:, 1]
+        
+
+class Odometry(object):
+    def __init__(self, landscape, observation_dim, max_time=100):
+        self.landscape = landscape
+        self.states = []
+        self.observations = []
+        self.motions = []
+        self.times = []
+
+        self.alphas = np.array([0.05, 0.001, 0.05, 0.01])
+        self.beta = np.array([10., 10.])
+        self.Q = np.diag([*(self.beta ** 2), 0])
+
+        self.observation_dim = observation_dim
+        self.max_time = max_time
+
+    def generate(self, n_steps):
+        self.times = sorted(np.random.uniform(0, self.max_time, n_steps))
+        initial_state = np.random.randn(3)
+        state = initial_state
+        self.states.append(initial_state)
+        drot1 = 0
+        dtr = 1
+        drot2 = 0
+        for i in range(n_steps):
+            noisy_observations = []
+            while len(noisy_observations) == 0:
+                # new_drot1 = np.random.normal(drot1, 0.05)
+                # new_dtr = np.random.normal(dtr, 0.05)
+                # new_drot2 = np.random.normal(drot2, 0.05)
+
+                # motion = np.array([new_drot1, new_dtr, new_drot2])
+                
+                # new_state = sample_from_odometry(state, motion, self.alphas)
+
+                drot1 = np.random.normal(drot1, 0.1)
+                dtr = np.random.normal(dtr, 0.1)
+                drot2 = np.random.normal(drot2, 0.1)
+
+                motion = np.array([drot1, dtr, drot2])
+                
+                state = sample_from_odometry(state, motion, self.alphas)
+                
+                noise_free_observations = sense_landmarks(state, self.landscape, 1)
+                observation_noise = np.random.multivariate_normal(np.zeros(self.observation_dim), self.Q)
+                # Generate noisy observation as observed by the robot for the filter.
+                noisy_observations = np.empty(observation_noise.shape)
+                #print(noisy_observations.shape, observation_noise.shape)
+                #noisy_observations[0] = noise_free_observations[0] + observation_noise
+                noisy_observations = noise_free_observations + observation_noise
+            # state = new_state
+            # drot1 = new_drot1
+            # dtr = new_dtr
+            # drot2 = new_drot2
+            self.states.append(state)
+            self.motions.append(motion)
+            self.observations.append(noisy_observations)
+
+
 def sense_landmarks(state, field_map, max_observations):
     """
     Observes num_observations of landmarks for the current time step.
@@ -39,70 +112,6 @@ def sense_landmarks(state, field_map, max_observations):
         return noise_free_observations[ii]
     else:
         return noise_free_observations[:max_observations]
-
-class Landscape(object):
-    def __init__(self, num_landmarks=10, field_borders=(-10, 10)):
-        self.num_landmarks = num_landmarks
-        self.field_borders = field_borders
-
-        self.landmarks = []
-        self.landmarks_poses_x = []
-        self.landmarks_poses_y = []
-
-    def initialize(self):
-        self.landmarks = np.random.uniform(self.field_borders[0], self.field_borders[1], (self.num_landmarks, 2)).reshape(self.num_landmarks, 2)
-        self.landmarks_poses_x = self.landmarks[:, 0]
-        self.landmarks_poses_y = self.landmarks[:, 1]
-        
-
-class Odometry(object):
-    def __init__(self, landscape, observation_dim, max_time=100):
-        self.landscape = landscape
-        self.states = []
-        self.observations = []
-        self.motions = []
-        self.times = []
-
-        self.alphas = np.array([0, 0, 0, 0]) #np.array([0.05, 0.001, 0.05, 0.01])
-        self.beta = np.array([1., 1.]) #np.array([10., 10.])
-        self.Q = np.diag([*(self.beta ** 2), 0])
-
-        self.observation_dim = observation_dim
-        self.max_time = max_time
-
-    def generate(self, n_steps):
-        self.times = sorted(np.random.uniform(0, self.max_time, n_steps))
-        initial_state = np.random.randn(3)
-        state = initial_state
-        self.states.append(initial_state)
-        drot1 = 0
-        dtr = 1
-        drot2 = 0
-        for i in range(n_steps):
-            noisy_observations = []
-            while len(noisy_observations) == 0:
-                new_drot1 = np.random.normal(drot1, 0.05)
-                new_dtr = np.random.normal(dtr, 0.05)
-                new_drot2 = np.random.normal(drot2, 0.05)
-
-                motion = np.array([new_drot1, new_dtr, new_drot2])
-                
-                new_state = sample_from_odometry(state, motion, self.alphas)
-                
-                noise_free_observations = sense_landmarks(new_state, self.landscape, 1)
-                observation_noise = np.random.multivariate_normal(np.zeros(self.observation_dim), self.Q)
-                # Generate noisy observation as observed by the robot for the filter.
-                noisy_observations = np.empty(observation_noise.shape)
-                #print(noisy_observations.shape, observation_noise.shape)
-                #noisy_observations[0] = noise_free_observations[0] + observation_noise
-                noisy_observations = noise_free_observations + observation_noise
-            state = new_state
-            drot1 = new_drot1
-            dtr = new_dtr
-            drot2 = new_drot2
-            self.states.append(state)
-            self.motions.append(motion)
-            self.observations.append(noisy_observations)
 
 
 
@@ -168,14 +177,6 @@ def wrap_angle(angle):
     :param angle: The angle (in rad) to wrap (can be unbounded).
     :return: The wrapped angle (guaranteed to in [-pi, +pi]).
     """
-
-    # pi2 = 2 * np.pi
-
-    # while angle < -np.pi:
-    #     angle += pi2
-
-    # while angle >= np.pi:
-    #     angle -= pi2
 
     angle = (angle + np.pi) % (2 * np.pi) - np.pi
 

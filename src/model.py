@@ -82,7 +82,7 @@ class Model(object):
             y_vector = phi_matrix @ self.b
             #y_vector[:self.n_features*self.state_dim] += self.prior_mean
             cut = y_vector[:self.n_features*self.state_dim].reshape(self.state_dim, self.n_features).sum(1)
-            if n_iter <  10: # == 0 (!)
+            if n_iter == 0: # == 0 (!)
                 if i == 0:
                     pass
                 else:
@@ -110,12 +110,13 @@ class Model(object):
             g += phi_matrix.T @ dh.T @ self.inv_measurement_covs[i] @ (self.measurements[i, :-1] - h)
 
         A += self.inv_P_matrix
-        g += self.inv_P_matrix @ (self.b - self.b_means)
+        g -= self.inv_P_matrix @ (self.b - self.b_means)
 
         return A, g
 
     def solve(self, A, g):
         A = A + self.dampening_factor * np.diag(A)[:, None]
+        #print('Conditional number:', np.linalg.cond(A))
         db = scipy.linalg.solve(A, g)
         return db
 
