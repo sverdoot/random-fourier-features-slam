@@ -53,10 +53,14 @@ chmod +x ./run_experiment.sh
 
 ## Usage
 
-```bash
-python src/main.py -v --observation_model range-bearing
-```
+run a single slam example:
 
 ```bash
-./run_experiment.sh
+python src/main.py -v --obs_model range-bearing --plot_traj
+```
+
+run a whole experiment:
+
+```bash
+./run_experiment.sh true
 ```
