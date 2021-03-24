@@ -33,7 +33,7 @@ def parse_arguments():
     parser.add_argument('--lengthscale', type=float, default=3.)
     parser.add_argument('--b_sigma', type=float, default=0.1)
     parser.add_argument('--land_sigma', type=float, default=3)
-    parser.add_argument('--dampening_factor', type=float, default=0.05)
+    parser.add_argument('--dampening_factor', type=float, default=1e-4)
     parser.add_argument('--n_iter', type=int, default=100)
     parser.add_argument('--path_to_trajectory', type=str, default=None)
     parser.add_argument('--path_to_dump', type=str)

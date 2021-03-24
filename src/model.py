@@ -24,7 +24,7 @@ class Model(object):
                 observation_model : callable,
                 prior_mean : callable = get_prediction,
                 tol : float = 1e-3,
-                dumpening_factor : float = 1e-2,
+                dampening_factor : float = 1e-3,
                 max_n_iter : int = 1e3,
                 verbose : bool = True,
                 **kwargs):
@@ -39,7 +39,7 @@ class Model(object):
         self.b_means = np.concatenate([b_means.reshape(-1), land_means.reshape(-1)], 0)
         #self.land_means = land_means
         self.max_n_iter = max_n_iter
-        self.dampening_factor = dumpening_factor
+        self.dampening_factor = dampening_factor
         self.tol = tol
         self.verbose = verbose
 
@@ -88,29 +88,43 @@ class Model(object):
             self.prior_means.append(mean)
             state_cut += mean
 
-            measurement = self.measurements[i][0]  # assume only one landmark per step
-            landmark_id = int(measurement[-1])  # assume data assotiation is known
-            observation = measurement[:-1]
-            landmark_start_idx = self.state_feature_dim+landmark_id*self.landmark_dim
-            landmark_cut = y_vector[landmark_start_idx:landmark_start_idx+self.landmark_dim]
-            h = self.observation_model.get_measurement(state_cut, landmark_cut)
-            dh = self.observation_model.get_jacobian(state_cut, landmark_cut, h)
-            obs_dim = dh.shape[0]
+            mesurement_cov = block_diag(*[self.inv_measurement_covs[i]]*len(self.measurements[i]))
+            diffs = []
+            dhs = [] 
+            for measurement in self.measurements[i]:
+            #measurement = self.measurements[i][0]  # assume only one landmark per step
+                landmark_id = int(measurement[-1])  # assume data assotiation is known
+                observation = measurement[:-1]
+                landmark_start_idx = self.state_feature_dim+landmark_id*self.landmark_dim
+                landmark_cut = y_vector[landmark_start_idx:landmark_start_idx+self.landmark_dim]
+                h = self.observation_model.get_measurement(state_cut, landmark_cut)
+                dh = self.observation_model.get_jacobian(state_cut, landmark_cut, h)
+                obs_dim = dh.shape[0]
 
-            state_part = dh[:, :self.state_dim].reshape(obs_dim, self.state_dim, 1).repeat(self.n_features, 2).reshape(obs_dim, -1)
-            
-            lands_part = np.zeros((obs_dim, self.landmark_dim*self.M))
-            lands_part[:, self.landmark_dim*landmark_id : self.landmark_dim*landmark_id + self.landmark_dim] = dh[:, self.state_dim:]
-            
-            dh = np.concatenate([state_part, lands_part], 1)
+                state_part = dh[:, :self.state_dim].reshape(obs_dim, self.state_dim, 1).repeat(self.n_features, 2).reshape(obs_dim, -1)
+                
+                lands_part = np.zeros((obs_dim, self.landmark_dim*self.M))
+                lands_part[:, self.landmark_dim*landmark_id : self.landmark_dim*landmark_id + self.landmark_dim] = dh[:, self.state_dim:]
+                
+                dh = np.concatenate([state_part, lands_part], 1)
 
-            A += phi_matrix.T @ dh.T @ self.inv_measurement_covs[i] @ dh @ phi_matrix
+                diff = observation - h
+                if hasattr(self.observation_model, 'bearing_noise_std'):
+                    diff[-1] = wrap_angle(diff[-1])
+
+                diffs.append(diff)
+                dhs.append(dh)
+
+            diffs = np.concatenate(diffs, 0)
+            dhs = np.concatenate(dhs, 0)
+
+            A += phi_matrix.T @ dhs.T @ mesurement_cov @ dhs @ phi_matrix
             
-            diff = observation - h
-            if hasattr(self.observation_model, 'bearing_noise_std'):
-                diff[-1] = wrap_angle(diff[-1])
+            g += phi_matrix.T @ dhs.T @ mesurement_cov @ diffs
+
+            # A += phi_matrix.T @ dh.T @ self.inv_measurement_covs[i] @ dh @ phi_matrix
             
-            g += phi_matrix.T @ dh.T @ self.inv_measurement_covs[i] @ diff
+            # g += phi_matrix.T @ dh.T @ self.inv_measurement_covs[i] @ diff
 
         A += self.inv_P_matrix
         diff = self.b - self.b_means
@@ -195,6 +209,7 @@ def train(
         land_means = landscape.landmarks
     elif landmark_mean == 'zero':
         land_means = np.zeros((num_landmarks, landmark_dim))
+        #land_means = np.random.uniform(0, 1, (num_landmarks, landmark_dim))*np.array(landscape.field_borders)[None, :]
     initial_values[n_features*state_dim:] = land_means.reshape(-1)
 
     observations = observation_model.filter_odom_observations(odometry.observations)

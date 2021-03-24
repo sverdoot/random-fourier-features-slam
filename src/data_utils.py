@@ -25,7 +25,7 @@ class Odometry(object):
                 max_time=100, 
                 beta : np.ndarray = np.array([10., 10.]),
                 alphas : np.ndarray = np.array([0.05, 0.001, 0.05, 0.01]),
-                max_landmarks_per_step : int = 2):
+                max_landmarks_per_step : int = 30):
         self.landscape = landscape
         self.states = []
         self.observations = []
@@ -52,34 +52,38 @@ class Odometry(object):
         drot2 = 0
         for i in range(n_steps):
             noisy_observations = []
+            motion = np.zeros(3)
+            i = 1
             while len(noisy_observations) == 0:
-                # new_drot1 = np.random.normal(drot1, 0.05)
-                # new_dtr = np.random.normal(dtr, 0.05)
-                # new_drot2 = np.random.normal(drot2, 0.05)
+                new_drot1 = np.random.normal(drot1, 0.05*i)
+                new_dtr = np.random.normal(dtr, 0.05*i)
+                new_drot2 = np.random.normal(drot2, 0.05*i)
 
-                # motion = np.array([new_drot1, new_dtr, new_drot2])
+                motion = np.array([new_drot1, new_dtr, new_drot2])
                 
-                # new_state = sample_from_odometry(state, motion, self.alphas)
+                new_state = sample_from_odometry(state, motion, self.alphas)
 
-                drot1 = np.random.normal(drot1, 0.03)
-                dtr = np.random.normal(dtr, 0.03)
-                drot2 = np.random.normal(drot2, 0.03)
+                # drot1 = np.random.normal(drot1, 0.03)
+                # dtr = np.random.normal(dtr, 0.03)
+                # drot2 = np.random.normal(drot2, 0.03)
 
-                motion = np.array([drot1, dtr, drot2])
+                # motion += np.array([drot1, dtr, drot2])
                 
-                state = sample_from_odometry(state, motion, self.alphas)
+                # state = sample_from_odometry(state, motion, self.alphas)
                 
-                noise_free_observations = sense_landmarks(state, self.landscape, self.max_landmarks_per_step)
+                noise_free_observations = sense_landmarks(new_state, self.landscape, self.max_landmarks_per_step)
                 observation_noise = np.random.multivariate_normal(np.zeros(self.observation_dim), self.Q, size=len(noise_free_observations))
                 assert observation_noise.shape == noise_free_observations.shape
                 noisy_observations = np.empty(observation_noise.shape)
                 #noisy_observations[0] = noise_free_observations[0] + observation_noise
                 noisy_observations = noise_free_observations + observation_noise
-            # state = new_state
-            # drot1 = new_drot1
-            # dtr = new_dtr
-            # drot2 = new_drot2
+            state = new_state
+            drot1 = new_drot1
+            dtr = new_dtr
+            drot2 = new_drot2
             self.states.append(state)
+            motion[0] = wrap_angle(motion[0])
+            motion[2] = wrap_angle(motion[2])
             self.motions.append(motion)
             self.observations.append(noisy_observations)
 
