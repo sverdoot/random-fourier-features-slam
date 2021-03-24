@@ -29,11 +29,11 @@ def parse_arguments():
     parser.add_argument('-M', '--num_landmarks', dest='num_landmarks', type=int, default=20)
     parser.add_argument('-N', '--num_points', dest='num_points', type=int, default=100)
     parser.add_argument('-D', '--num_features', dest='num_features', type=int, default=100)
-    parser.add_argument('--landmark_mean', type=str, choices=['true', 'zero'], default='true')
+    parser.add_argument('--landmark_mean', type=str, choices=['true', 'zero'], default='zero')
     parser.add_argument('--lengthscale', type=float, default=3.)
-    parser.add_argument('--b_sigma', type=float, default=0.1)
+    parser.add_argument('--b_sigma', type=float, default=0.05)
     parser.add_argument('--land_sigma', type=float, default=3)
-    parser.add_argument('--dampening_factor', type=float, default=1e-4)
+    parser.add_argument('--dampening_factor', type=float, default=1e-5)
     parser.add_argument('--n_iter', type=int, default=100)
     parser.add_argument('--path_to_trajectory', type=str, default=None)
     parser.add_argument('--path_to_dump', type=str)
@@ -66,7 +66,7 @@ def main(args):
         odometry.load(Path(args.path_to_trajectory))
     else:
         landscape.initialize()
-        odometry = Odometry(landscape=landscape, beta=beta)
+        odometry = Odometry(landscape=landscape, beta=np.array(beta))
         odometry.generate(n_steps=args.num_points)
 
     model = train(landscape, 
@@ -117,14 +117,15 @@ def main(args):
     if args.plot_traj:
         fig = plt.subplots()
         lands = np.stack(landscape.landmarks, 0)
-        plt.scatter(lands[:, 0], lands[:, 1], c='b', s=150, alpha=0.7)
+        plt.scatter(lands[:, 0], lands[:, 1], c='b', s=150, alpha=0.7, label='true landmarks')
         #real_states = np.stack(odometry.states, 0)
-        plt.scatter(real_states[:, 0], real_states[:, 1], c='r')
+        plt.plot(real_states[:, 0], real_states[:, 1], '-o', c='r', alpha=0.7, label='true trajectory')
         #real_states = np.stack(odometry.states, 0)
         model_lands = model.b[model.state_feature_dim:].reshape(args.num_landmarks, 2)
-        plt.scatter(model_lands[:, 0], model_lands[:, 1], c='tab:gray', s=150, alpha=0.7)
-        plt.scatter(model_states[:, 0], model_states[:, 1], c='g')
-        plt.savefig(Path(DUMP_DIR, 'traj.png'))
+        plt.scatter(model_lands[:, 0], model_lands[:, 1], c='tab:gray', s=150, alpha=0.7, label='estimated landmarks')
+        plt.plot(model_states[:, 0], model_states[:, 1], '-o', c='g', alpha=0.7, label='estimated trajectory')
+        plt.legend()
+        plt.savefig(Path(DUMP_DIR, 'traj.pdf'))
         plt.close()
 
 if __name__ == '__main__':

@@ -10,6 +10,7 @@ This repository contains python implementation of method from the paper [Random 
 ├── README.md
 ├── requirements.txt
 ├── setup.py
+├── run_experiment.sh
 ├── dump
 ├── figs
 └── src
@@ -28,6 +29,7 @@ This repository contains python implementation of method from the paper [Random 
 ```bash
 pip install -r requirements.txt
 pip intsall -e .
+chmod +x ./run_experiment.sh
 ```
 
 ## Usage
