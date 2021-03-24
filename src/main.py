@@ -31,11 +31,12 @@ def parse_arguments():
     parser.add_argument('-D', '--num_features', dest='num_features', type=int, default=100)
     parser.add_argument('--landmark_mean', type=str, choices=['true', 'zero'], default='zero')
     parser.add_argument('--lengthscale', type=float, default=3.)
-    parser.add_argument('--b_sigma', type=float, default=0.05)
-    parser.add_argument('--land_sigma', type=float, default=3)
+    parser.add_argument('--b_sigma', type=float, default=0.01)
+    parser.add_argument('--land_sigma', type=float, default=5)
     parser.add_argument('--dampening_factor', type=float, default=1e-5)
     parser.add_argument('--n_iter', type=int, default=100)
-    parser.add_argument('--path_to_trajectory', type=str, default=None)
+    parser.add_argument('--path_to_trajs', type=str, default=None)
+    parser.add_argument('--traj_id', type=int, default=0)
     parser.add_argument('--path_to_dump', type=str)
     parser.add_argument('--seed', type=int, default=None)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true')
@@ -60,10 +61,16 @@ def main(args):
 
     landscape = Landscape(args.num_landmarks)
 
-    if args.path_to_trajectory is not None:
-        landscape.load(Path(args.path_to_trajectory))
-        odometry = Odometry(landscape=landscape)
-        odometry.load(Path(args.path_to_trajectory))
+    if args.path_to_trajs is not None:
+        args.traj_id = int(args.traj_id)
+        trajs = np.load(Path(args.path_to_trajs))
+        lands = trajs['lands'][args.traj_id]
+        states = trajs['states'][args.traj_id]
+        times = trajs['times'][args.traj_id]
+        motions = trajs['motions'][args.traj_id]
+        landscape.load_and_initialize(lands)
+        odometry = Odometry(landscape=landscape, beta=np.array(beta))
+        odometry.load_and_get_observations(states, times, motions)
     else:
         landscape.initialize()
         odometry = Odometry(landscape=landscape, beta=np.array(beta))

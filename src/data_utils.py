@@ -15,7 +15,12 @@ class Landscape(object):
         self.landmarks = np.random.uniform(self.field_borders[0], self.field_borders[1], (self.num_landmarks, 2)).reshape(self.num_landmarks, 2)
         self.landmarks_poses_x = self.landmarks[:, 0]
         self.landmarks_poses_y = self.landmarks[:, 1]
-        
+
+    def load_and_initialize(self, lands):
+        n = lands.shape[0]
+        self.landmarks = np.concatenate([lands, np.random.uniform(self.field_borders[0], self.field_borders[1], (self.num_landmarks-n, 2)).reshape(self.num_landmarks-n, 2)], 0)
+        self.landmarks_poses_x = self.landmarks[:, 0]
+        self.landmarks_poses_y = self.landmarks[:, 1]
 
 class Odometry(object):
     state_dim = 3
@@ -48,16 +53,19 @@ class Odometry(object):
         state = initial_state
         self.states.append(initial_state)
         drot1 = 0
-        dtr = 0.6
+        dtr = 0.8
         drot2 = 0
-        for i in range(n_steps):
+        for _ in range(n_steps):
             noisy_observations = []
             motion = np.zeros(3)
             i = 1
             while len(noisy_observations) == 0:
-                new_drot1 = np.random.normal(drot1, 0.05*i)
-                new_dtr = np.random.normal(dtr, 0.05*i)
-                new_drot2 = np.random.normal(drot2, 0.05*i)
+                # if i > 10:
+                #     return self.generate()
+                new_drot1 = np.random.normal(drot1, 0.02*i)
+                new_dtr = np.random.normal(dtr, 0.1*i)
+                new_drot2 = np.random.normal(drot2, 0.02*i)
+                i += 0.05
 
                 motion = np.array([new_drot1, new_dtr, new_drot2])
                 
@@ -86,6 +94,24 @@ class Odometry(object):
             self.motions.append(motion)
             self.observations.append(noisy_observations)
 
+    def load_and_get_observations(self, states, times, motions):
+        self.num_points = len(states)
+        self.times = list(times)
+        self.states = states
+        self.motions = motions
+        for step_id in range(self.num_points):
+            noisy_observations = []
+            #motion = motions[step_id]
+            state = states[step_id]
+                
+            noise_free_observations = sense_landmarks(state, self.landscape, self.max_landmarks_per_step)
+            observation_noise = np.random.multivariate_normal(np.zeros(self.observation_dim), self.Q, size=len(noise_free_observations))
+            assert observation_noise.shape == noise_free_observations.shape
+            noisy_observations = np.empty(observation_noise.shape)
+            noisy_observations = noise_free_observations + observation_noise
+            self.observations.append(noisy_observations)
+
+
 
 def sense_landmarks(state, field_map, max_observations):
     """
@@ -104,6 +130,7 @@ def sense_landmarks(state, field_map, max_observations):
     assert state.shape == (3,)
 
     M = field_map.num_landmarks
+    #print(M, field_map.landmarks.shape)
     noise_free_observations_list = list()
     for k in range(M):
         noise_free_observations_list.append(get_observation(state, field_map, k))

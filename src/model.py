@@ -1,4 +1,3 @@
-import torch
 import numpy as np
 import scipy
 from scipy.linalg import block_diag
@@ -81,7 +80,7 @@ class Model(object):
                     pass
                 else:
                     self.states[i-1] = self.prior_means[i-1]
-            mean = self.prior_mean(t, np.concatenate([self.initial_state.reshape(1, self.state_dim), self.states], 0))
+            mean = self.prior_mean(t, np.concatenate([self.initial_state.reshape(1, self.state_dim), self.states], 0), i)
             self.prior_means.append(mean)
             state_cut += mean
 
@@ -189,8 +188,9 @@ def train(
     assert n_features % 2 == 0
     rff = RFF(n_features = n_features // 2, w_sampler=sampler, dim=1)
 
-    def prior_mean(t, state_estimates):
-        i = odometry.times.index(t)
+    def prior_mean(t, state_estimates, i=None):
+        if i is None:
+            i = odometry.times.index(t)
         state = get_prediction(state_estimates[i], odometry.motions[i])
         return state
 

@@ -58,6 +58,9 @@ def save_result(model, metrics : dict, path_to_save, args):
     else:
         storage = defaultdict(dict)
 
+    if args.obs_model not in storage.keys():
+        storage[args.obs_model] = defaultdict(dict)
+
     if str(args.num_landmarks) not in storage[args.obs_model].keys():
         storage[args.obs_model][str(args.num_landmarks)] = defaultdict(list)
     if str(args.noise_level) not in storage[args.obs_model][str(args.num_landmarks)].keys():

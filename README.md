@@ -3,6 +3,11 @@
 This repository contains python implementation of method from the paper [Random Fourier Features based SLAM](https://arxiv.org/pdf/2011.00594.pdf).
 
 
+## Table of content
+  - [Repository structure](#repository-structure)
+  - [Installation](#installation)
+  - [Usage](#usage)
+
 ## Repository structure
 
 ```bash
@@ -12,7 +17,11 @@ This repository contains python implementation of method from the paper [Random 
 ├── setup.py
 ├── run_experiment.sh
 ├── dump
+├── data
 ├── figs
+├── notebooks
+|   ├── plot_results.ipynb
+|   └── generate_data.ipynb
 └── src
     ├── __init__.py
     ├── main.py
@@ -26,6 +35,16 @@ This repository contains python implementation of method from the paper [Random 
 ```
 ## Installation
 
+in the home dir:
+
+```bash
+cd [VENV]
+virtualenv rff-slam
+source rff-slam/bin/activate
+```
+
+back in the project dir:
+
 ```bash
 pip install -r requirements.txt
 pip intsall -e .
@@ -36,4 +55,8 @@ chmod +x ./run_experiment.sh
 
 ```bash
 python src/main.py -v --observation_model range-bearing
+```
+
+```bash
+./run_experiment.sh
 ```
