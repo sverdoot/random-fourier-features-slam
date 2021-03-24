@@ -39,8 +39,8 @@ in the home dir:
 
 ```bash
 cd [VENV]
-virtualenv rff-slam
-source rff-slam/bin/activate
+virtualenv rff_slam
+source rff_slam/bin/activate
 ```
 
 back in the project dir:
