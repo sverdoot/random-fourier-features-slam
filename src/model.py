@@ -46,7 +46,6 @@ class Model(object):
         self.K_matrix = block_diag(*b_covs)
         self.P_matrix = block_diag(self.K_matrix, *land_cov)
         self.inv_P_matrix = block_diag(*[np.linalg.inv(x) for x in b_covs], *[np.linalg.inv(x) for x in land_cov])
-
         self.measurement_covs = measurement_covs
         self.inv_measurement_covs = [np.linalg.inv(x) for x in measurement_covs]
         self.R_matrix = block_diag(*measurement_covs)
@@ -54,6 +53,8 @@ class Model(object):
 
         self.n_features = 2*rff.n_features
         self.state_dim = len(b_covs)
+        self.state_feature_dim = self.n_features * self.state_dim
+        self.landmark_dim = 2
 
         self.prior_mean = prior_mean
         self.observation_model = observation_model
@@ -63,10 +64,6 @@ class Model(object):
         self.prior_means = []
         self.states = np.zeros((len(times), 3))
         self.estimates_history = []
-
-        self.landmark_dim = 2
-
-        self.state_feature_dim = self.n_features * self.state_dim
 
     def update_params(self, iter_id=0):
         features = self.features
@@ -92,7 +89,6 @@ class Model(object):
             diffs = []
             dhs = [] 
             for measurement in self.measurements[i]:
-            #measurement = self.measurements[i][0]  # assume only one landmark per step
                 landmark_id = int(measurement[-1])  # assume data assotiation is known
                 observation = measurement[:-1]
                 landmark_start_idx = self.state_feature_dim+landmark_id*self.landmark_dim
@@ -119,12 +115,7 @@ class Model(object):
             dhs = np.concatenate(dhs, 0)
 
             A += phi_matrix.T @ dhs.T @ mesurement_cov @ dhs @ phi_matrix
-            
             g += phi_matrix.T @ dhs.T @ mesurement_cov @ diffs
-
-            # A += phi_matrix.T @ dh.T @ self.inv_measurement_covs[i] @ dh @ phi_matrix
-            
-            # g += phi_matrix.T @ dh.T @ self.inv_measurement_covs[i] @ diff
 
         A += self.inv_P_matrix
         diff = self.b - self.b_means
@@ -209,7 +200,6 @@ def train(
         land_means = landscape.landmarks
     elif landmark_mean == 'zero':
         land_means = np.zeros((num_landmarks, landmark_dim))
-        #land_means = np.random.uniform(0, 1, (num_landmarks, landmark_dim))*np.array(landscape.field_borders)[None, :]
     initial_values[n_features*state_dim:] = land_means.reshape(-1)
 
     observations = observation_model.filter_odom_observations(odometry.observations)

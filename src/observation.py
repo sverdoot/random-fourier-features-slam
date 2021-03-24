@@ -1,6 +1,8 @@
 import numpy as np
 from abc import ABC, abstractmethod
 
+from data_utils import wrap_angle
+
 
 class ObservationModel(ABC):
     @abstractmethod
@@ -45,18 +47,19 @@ class BearingModel(ObservationModel):
 
     def get_measurement(self, state, landmark):
         h = np.array(
-                [np.arctan2(landmark[0] - state[0], landmark[1] - state[1]) - state[2]]
+                [wrap_angle(np.arctan2(landmark[1] - state[1], landmark[0] - state[0]) - state[2])]
         )
         return h
 
     def get_jacobian(self, state, landmark, measurement):
+        dist2 = (state[0] - landmark[0])**2 + (state[1] - landmark[1])**2
         dh = np.array(
                     [
-                        [(landmark[1] - state[1]) / measurement[0]**2,
-                        -(landmark[0] - state[0]) / measurement[0]**2,
+                        [(landmark[1] - state[1]) / dist2,
+                        -(landmark[0] - state[0]) / dist2,
                         -1.,
-                        -(landmark[1] - state[1]) / measurement[0]**2,
-                        (landmark[0] - state[0]) / measurement[0]**2
+                        -(landmark[1] - state[1]) / dist2,
+                        (landmark[0] - state[0]) / dist2
                         ]
                     ]
         )
@@ -77,7 +80,7 @@ class RangeBearingModel(ObservationModel):
     def get_measurement(self, state, landmark):
         h = np.array(
                 [np.sqrt((state[0] - landmark[0])**2 + (state[1] - landmark[1])**2),
-                np.arctan2(landmark[0] - state[0], landmark[1] - state[1]) - state[2]]
+                wrap_angle(np.arctan2(landmark[1] - state[1], landmark[0] - state[0]) - state[2])]
         )
         return h
 

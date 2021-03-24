@@ -24,7 +24,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('--obs_model', help='observation model', type=str, choices=["range-bearing", "range", "bearing"], default="range-bearing")
     parser.add_argument('--beta', '-b', dest='beta',
-                        help='std of observations. if model is range-bearing range first, bearing second',
+                        help='std of observations. if model is range-bearing range first, bearing second. Bearing noise should be in grad',
                         type=float, nargs='+', default=np.array([2., 5.]))
     parser.add_argument('-M', '--num_landmarks', dest='num_landmarks', type=int, default=20)
     parser.add_argument('-N', '--num_points', dest='num_points', type=int, default=100)
@@ -51,7 +51,8 @@ def main(args):
 
     beta = copy.copy(args.beta)
     if args.obs_model == 'bearing':
-        beta[0] = np.deg2rad(args.beta[0])
+        beta[0] = np.deg2rad(args.beta[1])
+        beta[1] = np.deg2rad(args.beta[1])
     elif args.obs_model == 'range-bearing':
         beta[1] = np.deg2rad(args.beta[1])
 

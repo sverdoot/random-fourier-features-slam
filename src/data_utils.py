@@ -23,7 +23,7 @@ class Odometry(object):
                 landscape, 
                 observation_dim=3, 
                 max_time=100, 
-                beta : np.ndarray = np.array([10., 10.]),
+                beta : np.ndarray = np.array([3., 0.05]),
                 alphas : np.ndarray = np.array([0.05, 0.001, 0.05, 0.01]),
                 max_landmarks_per_step : int = 30):
         self.landscape = landscape
@@ -75,7 +75,6 @@ class Odometry(object):
                 observation_noise = np.random.multivariate_normal(np.zeros(self.observation_dim), self.Q, size=len(noise_free_observations))
                 assert observation_noise.shape == noise_free_observations.shape
                 noisy_observations = np.empty(observation_noise.shape)
-                #noisy_observations[0] = noise_free_observations[0] + observation_noise
                 noisy_observations = noise_free_observations + observation_noise
             state = new_state
             drot1 = new_drot1
