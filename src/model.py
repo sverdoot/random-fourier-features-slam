@@ -107,8 +107,8 @@ class Model(object):
             A += phi_matrix.T @ dh.T @ self.inv_measurement_covs[i] @ dh @ phi_matrix
             
             diff = observation - h
-            if obs_dim == 2:
-                diff = wrap_angle(diff)
+            if hasattr(self.observation_model, 'bearing_noise_std'):
+                diff[-1] = wrap_angle(diff[-1])
             
             g += phi_matrix.T @ dh.T @ self.inv_measurement_covs[i] @ diff
 
@@ -165,7 +165,7 @@ def train(
         sigma_l = 3.,
         n_iter = 100,
         b_sigma = 0.1,
-        land_sigma = 1,
+        land_sigma = 3,
         dampening_factor = 0.05,
         landmark_mean='true',
         verbose=False

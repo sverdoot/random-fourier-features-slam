@@ -48,7 +48,7 @@ class Odometry(object):
         state = initial_state
         self.states.append(initial_state)
         drot1 = 0
-        dtr = 1
+        dtr = 0.6
         drot2 = 0
         for i in range(n_steps):
             noisy_observations = []
@@ -61,9 +61,9 @@ class Odometry(object):
                 
                 # new_state = sample_from_odometry(state, motion, self.alphas)
 
-                drot1 = np.random.normal(drot1, 0.1)
-                dtr = np.random.normal(dtr, 0.1)
-                drot2 = np.random.normal(drot2, 0.1)
+                drot1 = np.random.normal(drot1, 0.03)
+                dtr = np.random.normal(dtr, 0.03)
+                drot2 = np.random.normal(drot2, 0.03)
 
                 motion = np.array([drot1, dtr, drot2])
                 

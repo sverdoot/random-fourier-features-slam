@@ -9,8 +9,15 @@ from random_features import RFF
 from data_utils import Landscape, Odometry
 from model import Model, train
 from observation import ObservationModelFactory
-from utils import APE_rot, APE_trans, save_result
-
+from utils import (
+    get_rigid_body_transformation, 
+    get_relative_pose,
+    get_relative_poses_diff, 
+    pose_error_rot, 
+    pose_error_trans, 
+    save_result,
+    DUMP_DIR
+)
 
 
 def parse_arguments():
@@ -23,11 +30,16 @@ def parse_arguments():
     parser.add_argument('-N', '--num_points', dest='num_points', type=int, default=100)
     parser.add_argument('-D', '--num_features', dest='num_features', type=int, default=100)
     parser.add_argument('--landmark_mean', type=str, choices=['true', 'zero'], default='true')
+    parser.add_argument('--lengthscale', type=float, default=3.)
+    parser.add_argument('--b_sigma', type=float, default=0.1)
+    parser.add_argument('--land_sigma', type=float, default=3)
+    parser.add_argument('--dampening_factor', type=float, default=0.05)
     parser.add_argument('--n_iter', type=int, default=100)
     parser.add_argument('--path_to_trajectory', type=str, default=None)
     parser.add_argument('--path_to_dump', type=str)
     parser.add_argument('--seed', type=int, default=None)
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true')
+    parser.add_argument('--plot_traj', action='store_true')
 
     args = parser.parse_args()
     return args
@@ -45,7 +57,7 @@ def main(args):
 
     observation_model = ObservationModelFactory(args.obs_model, *beta)
 
-    landscape = Landscape()
+    landscape = Landscape(args.num_landmarks)
 
     if args.path_to_trajectory is not None:
         landscape.load(Path(args.path_to_trajectory))
@@ -60,25 +72,59 @@ def main(args):
             odometry, 
             observation_model,
             n_features=args.num_features,
+            sigma_l=args.lengthscale,
+            b_sigma=args.b_sigma,
+            land_sigma=args.land_sigma,
+            dampening_factor=args.dampening_factor,
             n_iter=args.n_iter,
             landmark_mean=args.landmark_mean,
             verbose=args.verbose
             )
-    estimated_states = np.stack(model.states, 0)
-    real_sates = np.stack(odometry.states[1:], 0)
+    model_states = np.stack(model.states, 0)
+    real_states = np.stack(odometry.states[1:], 0)
 
-    ape_rot = APE_rot(real_sates, estimated_states)
-    ape_trans = APE_trans(real_sates, estimated_states)
+    # model_states[:, :2] /= 10
+    # real_states[:, :2] /= 10
+    # landscape.landmarks /= 10
+
+    model_poses = [get_rigid_body_transformation(state) for state in model_states]
+    real_poses = [get_rigid_body_transformation(state) for state in real_states]
+
+    relative_poses = np.stack([get_relative_pose(r, m) for r, m in zip(real_poses, model_poses)], 0)
+    relative_poses_diffs = np.stack([get_relative_poses_diff(
+                                        real_poses[i], 
+                                        real_poses[i+1], 
+                                        model_poses[i], 
+                                        model_poses[i+1]) for i in range(len(model_poses)-1)], 0)
+
+    ape_rot = pose_error_rot(relative_poses)
+    ape_trans = pose_error_trans(relative_poses)
+
+    rpe_rot = pose_error_rot(relative_poses_diffs)
+    rpe_trans = pose_error_trans(relative_poses_diffs)
 
     if args.verbose:
         print(f'APE rot: {ape_rot:.4f}, APE trans: {ape_trans:.4f}')
-
+        print(f'RPE rot: {rpe_rot:.4f}, RPE trans: {rpe_trans:.4f}')
 
     if args.path_to_dump is not None:
         args.noise_level = str(tuple(args.beta))
-        metrics = {"ape_trans" : ape_trans, "ape_rot" : ape_rot}
+        metrics = {"ape_trans" : ape_trans, "ape_rot" : ape_rot,
+                    "rpe_trans" : rpe_trans, "rpe_rot" : rpe_rot}
         save_result(model, metrics, args.path_to_dump, args)
 
+    if args.plot_traj:
+        fig = plt.subplots()
+        lands = np.stack(landscape.landmarks, 0)
+        plt.scatter(lands[:, 0], lands[:, 1], c='b', s=150, alpha=0.7)
+        #real_states = np.stack(odometry.states, 0)
+        plt.scatter(real_states[:, 0], real_states[:, 1], c='r')
+        #real_states = np.stack(odometry.states, 0)
+        model_lands = model.b[model.state_feature_dim:].reshape(args.num_landmarks, 2)
+        plt.scatter(model_lands[:, 0], model_lands[:, 1], c='tab:gray', s=150, alpha=0.7)
+        plt.scatter(model_states[:, 0], model_states[:, 1], c='g')
+        plt.savefig(Path(DUMP_DIR, 'traj.png'))
+        plt.close()
 
 if __name__ == '__main__':
     args = parse_arguments()
